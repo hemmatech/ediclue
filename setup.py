@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='ediclue',
-    version="0.0.4",
+    version="0.0.5",
     description='An open source parser for EDIEL data',
     url='https://github.com/sun-labs/ediclue',
     author='Sun Labs Nordic AB',
@@ -27,6 +27,6 @@ setup(
         'Programming Language :: Python :: 3 :: Only'
     ],
     keywords='ediel energy parser consumption svk sunlabs edifact',
-    packages=['ediel_parser'],
+    packages=[find_packages],
     install_requires=[]
 )

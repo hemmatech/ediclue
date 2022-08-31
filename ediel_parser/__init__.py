@@ -1,3 +1,1 @@
-import ediel_parser.lib as lib
-
-__all__ = [lib]
+from .lib.edi_parser import EDIParser
