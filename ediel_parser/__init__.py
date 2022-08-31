@@ -1,1 +1,0 @@
-from .lib.edi_parser import EDIParser
