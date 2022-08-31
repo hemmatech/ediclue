@@ -1,3 +1,3 @@
-from ediel_parser.lib import EDIParser, EDICommunicator, Segment, UNSegment, segmentDefinitions, ediTools
+import ediel_parser.lib as lib
 
-__all__ = [EDIParser, EDICommunicator, Segment, UNSegment, segmentDefinitions, ediTools]
+__all__ = [lib]
