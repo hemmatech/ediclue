@@ -27,6 +27,6 @@ setup(
         'Programming Language :: Python :: 3 :: Only'
     ],
     keywords='ediel energy parser consumption svk sunlabs edifact',
-    packages=['ediel-parser'],
+    packages=['ediel_parser'],
     install_requires=[]
 )
