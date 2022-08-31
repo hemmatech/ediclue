@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='EDIEL Parser',
-    version=__version__,
+    version="0.0.1",
     description='An open source parser for EDIEL data',
     url='https://github.com/sun-labs/ediel-parser',
     author='Sun Labs Nordic AB',
