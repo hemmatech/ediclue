@@ -216,6 +216,10 @@ class EDIParser():
         dtm[0] = ['137', timestamp_now, '203']
         aperak.append(dtm)
 
+        timezone = UNSegment('DTM')
+        timezone[0] = ['735', '+0100', '406']
+        aperak.append(timezone)
+
         doc = UNSegment('DOC')
         doc[0] = [doc_message_name_code, '', doc_responsible_agency]
         doc[1] = [doc_message_number]
