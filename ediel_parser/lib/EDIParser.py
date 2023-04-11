@@ -243,31 +243,6 @@ class EDIParser():
         nad2[1] = [RECIPIENT_EDIEL_ID, 'SVK', '260']
         aperak.append(nad2)
 
-        # init loop of transaction
-        for s in segments:
-            if s.tag == 'IDE': # transaction
-                transaction_id = s['identification_number']['identity_number'].value
-
-                # group 3
-                erc = UNSegment('ERC') # godkänt
-                erc[0] = ['100', None, '260']
-                aperak.append(erc)
-
-                ftx = UNSegment('FTX') # godkänt
-                ftx[0] = 'AAO'
-                ftx[3] = 'OK'
-                aperak.append(ftx)
-
-                aperak_id = str(APERAK_START_ID + aperak_cnt)
-                aperak_cnt += 1
-                rff = UNSegment('RFF')
-                rff[0] = ['DM', aperak_id]
-                aperak.append(rff)
-
-                rff2 = UNSegment('RFF')
-                rff2[0] = ['ACW', transaction_id] # refererar till transaktionen som godkäns
-                aperak.append(rff2)
-
         unt = UNSegment('UNT')
         unt[0] = str(reduce(lambda acc, s: acc + 1, aperak, 0) - 1)
         unt[1] = UNIQUE_ID # segments['UNH']['r:0062'].value
