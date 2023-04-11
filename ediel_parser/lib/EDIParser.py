@@ -187,13 +187,14 @@ class EDIParser():
         aperak = [UNSegment('UNA')]
 
         unb = UNSegment('UNB')
-        unb['syntax_identifier']['syntax_identifier'] = 'UNOB'
+        unb['syntax_identifier']['syntax_identifier'] = 'UNOC'
         unb['syntax_identifier']['syntax_version_number'] = '3'
         unb['interchange_sender'] = [self.our_ediel_id, partner_identification_code_qualifier]
         unb['interchange_recipient'] = [RECIPIENT_EDIEL_ID, partner_identification_code_qualifier]
         unb['date-time_of_preparation'] = [timestamp_now[2:8], timestamp_now[8:]]
         unb['interchange_control_reference'] = UNIQUE_ID
         unb['application_reference'] = application_reference
+        unb['acknowledgement_request'] = '1'
         aperak.append(unb)
 
         unh = UNSegment('UNH')
