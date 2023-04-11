@@ -216,11 +216,6 @@ class EDIParser():
         dtm[0] = ['137', timestamp_now, '203']
         aperak.append(dtm)
 
-        ftx_uts = UNSegment('FTX')
-        ftx_uts[0] = 'ZZZ'
-        ftx_uts[3] = str(unix_timestamp)
-        aperak.append(ftx_uts)
-
         doc = UNSegment('DOC')
         doc[0] = [doc_message_name_code, '', doc_responsible_agency]
         doc[1] = [doc_message_number]
