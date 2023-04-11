@@ -4,9 +4,10 @@ from functools import reduce
 from hashlib import md5
 import time
 import email
-from email.utils import COMMASPACE, formatdate
+from email.utils import formatdate
 from email.mime.base import MIMEBase
 from email import encoders
+from typing import List, Tuple
 
 from pydifact.message import Message as PMessage
 
@@ -42,7 +43,7 @@ class EDIParser():
         elif self.format == 'mail':
             return self.parse_email()
 
-    def get_props_for(self, segment) -> (str, list):
+    def get_props_for(self, segment) -> Tuple[str, list]:
         if self.format == 'json':
             return segment.pop(0), segment
         elif self.format == 'edi' or self.format == 'mail':
@@ -61,7 +62,7 @@ class EDIParser():
         content = content.decode('utf-8')
         segments = self.parse_edi(content)
         return segments
-        
+
 
     def load_segment(self, segment):
         tag, elements = self.get_props_for(segment)
@@ -106,7 +107,7 @@ class EDIParser():
         else:
             return segment
 
-    def create_contrl(self, segments=None) -> [Segment]:
+    def create_contrl(self, segments=None) -> List[Segment]:
         segments = self.segments if segments is None else segments
         unix_timestamp = time.time()
         segment_hash = segments.__str__()
@@ -165,7 +166,7 @@ class EDIParser():
     """
     Generate aperak based on payload information
     """
-    def create_aperak(self, segments = None) -> [Segment]:
+    def create_aperak(self, segments = None) -> List[Segment]:
 
         segments = self.segments if segments is None else segments
 
@@ -177,6 +178,9 @@ class EDIParser():
 
         timestamp_now = edi.format_timestamp(datetime.now())
         partner_identification_code_qualifier = segments['UNB']['interchange_sender']['partner_identification_code_qualifier'].value
+        doc_name = segments['BGM']['document-message_name']
+        doc_message_name_code = doc_name['document-message_name-coded'].value
+        doc_responsible_agency = doc_name['code_list_responsible_agency-coded'].value
         doc_message_number = segments['BGM']['document-message_number'].value
         application_reference = segments['UNB']['application_reference'].value
 
@@ -191,14 +195,16 @@ class EDIParser():
         unb['interchange_control_reference'] = UNIQUE_ID
         unb['application_reference'] = application_reference
         aperak.append(unb)
-        
+
         unh = UNSegment('UNH')
         unh['r:0062'] = UNIQUE_ID # UNIQUE_ID
-        unh[1] = ['APERAK', 'D', '96A', 'UN', 'EDIEL2']
+        unh[1] = ['APERAK', 'D', '04A', 'UN', 'E5SE1B']
         aperak.append(unh)
 
         bgm = UNSegment('BGM')
-        bgm['response_type-coded'] = '29'
+        bgm[0] = '312' # Positive
+        bgm[1] = UNIQUE_ID
+        bgm[2] = '9'
         aperak.append(bgm)
 
         dtm = UNSegment('DTM')
@@ -209,6 +215,11 @@ class EDIParser():
         ftx_uts[0] = 'ZZZ'
         ftx_uts[3] = str(unix_timestamp)
         aperak.append(ftx_uts)
+
+        doc = UNSegment('DOC')
+        doc[0] = [doc_message_name_code, '', doc_responsible_agency]
+        doc[1] = [doc_message_number]
+        aperak.append(doc)
 
         # group1
         rff =  UNSegment('RFF')
@@ -237,7 +248,7 @@ class EDIParser():
         unz[0] = '1'
         unz[1] = UNIQUE_ID
         aperak.append(unz)
-        
+
         return edi.rstrip(aperak)
 
     """
