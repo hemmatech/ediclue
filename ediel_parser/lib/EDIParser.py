@@ -264,7 +264,7 @@ class EDIParser():
 
         unt = UNSegment('UNT')
         unt[0] = str(reduce(lambda acc, _: acc + 1, aperak, 0) - 1)
-        unt[1] = segments['UNH']['r:0062'].value
+        unt[1] = UNIQUE_ID
         aperak.append(unt)
 
         unz = UNSegment('UNZ')
