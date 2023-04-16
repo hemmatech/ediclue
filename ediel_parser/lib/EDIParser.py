@@ -207,9 +207,14 @@ class EDIParser():
         aperak.append(unh)
 
         bgm = UNSegment('BGM')
-        bgm[0] = '312' # Positive
+        bgm[0] = '313' # Negative
         bgm[1] = UNIQUE_ID
         bgm[2] = '9'
+
+        for s in segments:
+            if s.tag == 'RFF' and s['reference']['reference_qualifier'] == 'MG':
+                bgm[0] = '312' # Positive
+
         aperak.append(bgm)
 
         dtm = UNSegment('DTM')
@@ -259,7 +264,7 @@ class EDIParser():
                 aperak.append(rff)
 
                 rff2 = UNSegment('RFF')
-                rff2[0] = ['ACW', transaction_id] # refererar till transaktionen som godkäns
+                rff2[0] = ['ACW', transaction_id]
                 aperak.append(rff2)
 
         unt = UNSegment('UNT')
