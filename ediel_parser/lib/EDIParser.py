@@ -178,6 +178,8 @@ class EDIParser():
         RECIPIENT_EDIEL_ID = segments['UNB']['interchange_sender'][0].value
 
         aperaks = []
+        incorrect_field = None
+        validation = False
         timestamp_now = edi.format_timestamp(datetime.now())
         partner_identification_code_qualifier = segments['UNB']['interchange_sender']['partner_identification_code_qualifier'].value
         doc_name = segments['BGM']['document-message_name']
@@ -214,6 +216,10 @@ class EDIParser():
         for s in segments:
             if s.tag == 'RFF' and s['reference']['reference_qualifier'] == 'MG':
                 bgm[0] = '312' # Positive
+                validation = True
+
+        if not validation:
+            incorrect_field = '224'
 
         aperak.append(bgm)
 
@@ -249,7 +255,7 @@ class EDIParser():
                 transaction_id = s['identification_number']['identity_number'].value
 
                 erc = UNSegment('ERC')
-                if bgm[0] == '312':
+                if validation:
                     erc[0] = ['100', None, '260']
                 else:
                     erc[0] = ['41', None, '260']
@@ -258,10 +264,10 @@ class EDIParser():
 
                 ftx = UNSegment('FTX') # godkänt
                 ftx[0] = 'AAO'
-                if bgm[0] == '312':
+                if validation:
                     ftx[3] = 'OK'
                 else:
-                    ftx[2] = ['311', None , '260']
+                    ftx[2] = [incorrect_field, None , '260']
                     ftx[3] = 'MANDATORY FIELD MISSING'
 
                 aperak.append(ftx)
