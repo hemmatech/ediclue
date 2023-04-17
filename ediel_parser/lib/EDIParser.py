@@ -261,7 +261,7 @@ class EDIParser():
                 if bgm[0] == '312':
                     ftx[3] = 'OK'
                 else:
-                    ftx[3] = ['311', None , 'INCORRECT DATA']
+                    ftx[2] = ['311', None , 'INCORRECT DATA']
 
                 aperak.append(ftx)
 
