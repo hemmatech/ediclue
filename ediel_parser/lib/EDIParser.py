@@ -261,7 +261,8 @@ class EDIParser():
                 if bgm[0] == '312':
                     ftx[3] = 'OK'
                 else:
-                    ftx[2] = ['311', None , 'INCORRECT DATA']
+                    ftx[2] = ['311', None , '260']
+                    ftx[3] = 'MANDATORY FIELD MISSING'
 
                 aperak.append(ftx)
 
