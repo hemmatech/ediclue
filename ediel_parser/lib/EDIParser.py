@@ -319,23 +319,19 @@ class EDIParser():
         unix_timestamp = time.time()
         hash_string = '{}:{}'.format(segment_hash, unix_timestamp).encode('utf-8')
 
-        APERAK_START_ID = 1337
         UNIQUE_ID = str(md5(hash_string).hexdigest())[:14]
         RECIPIENT_EDIEL_ID = segments['UNB']['interchange_sender'][0].value
 
         timestamp_now = edi.format_timestamp(datetime.now())
         partner_identification_code_qualifier = segments['UNB']['interchange_sender']['partner_identification_code_qualifier'].value
-        doc_name = segments['BGM']['document-message_name']
         error_segment_ref = segments['IDE']['identification_number']['identity_number'].value
-        doc_message_name_code = doc_name['document-message_name-coded'].value
-        doc_responsible_agency = doc_name['code_list_responsible_agency-coded'].value
         doc_message_number = segments['BGM']['document-message_number'].value
         application_reference = segments['UNB']['application_reference'].value
 
         aperak = [UNSegment('UNA')]
 
         unb = UNSegment('UNB')
-        unb['syntax_identifier']['syntax_identifier'] = 'UNO3'
+        unb['syntax_identifier']['syntax_identifier'] = 'UNOC'
         unb['syntax_identifier']['syntax_version_number'] = '3'
         unb['interchange_sender'] = [self.our_ediel_id, partner_identification_code_qualifier]
         unb['interchange_recipient'] = [RECIPIENT_EDIEL_ID, partner_identification_code_qualifier]
