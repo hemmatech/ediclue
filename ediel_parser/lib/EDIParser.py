@@ -291,9 +291,137 @@ class EDIParser():
         unz[0] = '1'
         unz[1] = UNIQUE_ID
         aperak.append(unz)
+        aperak = self.check_functional_errors(segments, aperak)
         aperaks.append(edi.rstrip(aperak))
 
         return aperaks
+
+    def check_functional_errors(self, segments, aperak):
+        last_qty_220 = None
+        last_qty_diff = 0
+
+        for s in segments:
+            if s.tag == 'QTY':
+                if s['quantity_details']['quantity_qualifier'].value == '220':
+                    if last_qty_220:
+                        last_qty_diff = last_qty_220 - int(s['quantity_details']['quantity'].value)
+                        last_qty_220 = None
+                    else:
+                        last_qty_220 = int(s['quantity_details']['quantity'].value)
+                elif s['quantity_details']['quantity_qualifier'].value == '136':
+                    if int(s['quantity_details']['quantity'].value) != last_qty_diff:
+                        return self.create_utilts_err(segments)
+
+        return aperak
+
+    def create_utilts_err(self, segments):
+        segment_hash = segments.__str__()
+        unix_timestamp = time.time()
+        hash_string = '{}:{}'.format(segment_hash, unix_timestamp).encode('utf-8')
+
+        APERAK_START_ID = 1337
+        UNIQUE_ID = str(md5(hash_string).hexdigest())[:14]
+        RECIPIENT_EDIEL_ID = segments['UNB']['interchange_sender'][0].value
+
+        timestamp_now = edi.format_timestamp(datetime.now())
+        partner_identification_code_qualifier = segments['UNB']['interchange_sender']['partner_identification_code_qualifier'].value
+        doc_name = segments['BGM']['document-message_name']
+        error_segment_ref = segments['IDE']['identification_number']['identity_number'].value
+        doc_message_name_code = doc_name['document-message_name-coded'].value
+        doc_responsible_agency = doc_name['code_list_responsible_agency-coded'].value
+        doc_message_number = segments['BGM']['document-message_number'].value
+        application_reference = segments['UNB']['application_reference'].value
+
+        aperak = [UNSegment('UNA')]
+
+        unb = UNSegment('UNB')
+        unb['syntax_identifier']['syntax_identifier'] = 'UNO3'
+        unb['syntax_identifier']['syntax_version_number'] = '3'
+        unb['interchange_sender'] = [self.our_ediel_id, partner_identification_code_qualifier]
+        unb['interchange_recipient'] = [RECIPIENT_EDIEL_ID, partner_identification_code_qualifier]
+        unb['date-time_of_preparation'] = [timestamp_now[2:8], timestamp_now[8:]]
+        unb['interchange_control_reference'] = UNIQUE_ID
+        unb['application_reference'] = application_reference
+        unb['acknowledgement_request'] = '1'
+        aperak.append(unb)
+
+        unh = UNSegment('UNH')
+        unh['r:0062'] = '1'
+        unh[1] = ['UTILTS', 'D', '02B', 'UN', 'E5SE1B']
+        aperak.append(unh)
+
+        bgm = UNSegment('BGM')
+        bgm[0] = ['ERR', None, '260'] # Negative
+        bgm[1] = UNIQUE_ID
+        bgm[2] = '9'
+        bgm[3] = 'AB'
+
+        aperak.append(bgm)
+
+        dtm = UNSegment('DTM')
+        dtm[0] = ['137', timestamp_now, '203']
+        aperak.append(dtm)
+
+        timezone = UNSegment('DTM')
+        timezone[0] = ['735', '+0100', '406']
+        aperak.append(timezone)
+
+        mks = UNSegment('MKS')
+        mks[0] = '23'
+        mks[1] = ['E02', None, '260']
+        aperak.append(mks)
+
+        nad1 = UNSegment('NAD')
+        nad1['party_qualifier'] = 'MS'
+        nad1['party_identification_details'] = [self.our_ediel_id, 'SVK', '260']
+        aperak.append(nad1)
+
+        nad2 = UNSegment('NAD')
+        nad2[0] = 'MR' # message receiver
+        nad2[1] = [RECIPIENT_EDIEL_ID, 'SVK', '260']
+        aperak.append(nad2)
+
+        nad3 = UNSegment('NAD')
+        nad3[0] = 'DDQ'
+        aperak.append(nad3)
+
+        ide = UNSegment('IDE')
+        ide[0] = '24'
+        ide[1] = UNIQUE_ID
+        aperak.append(ide)
+        loc = list(filter(lambda s: s.tag == 'LOC', segments))
+        aperak.append(loc[1])
+        aperak.append(loc[0])
+        dtm = list(filter(lambda s: s.tag == 'DTM' and s['date-time-period']['date-time-period_qualifier'].value == '324', segments))[0]
+        dtm[0]['date-time-period_format_qualifier'] = '710'
+        aperak.append(dtm)
+        aperak.append(segments['STS'])
+
+        sts = UNSegment('STS')
+        sts[0] = ['E01', None, '260']
+        sts[1] = '41'
+        sts[2] = ['E50', None, '260']
+        aperak.append(sts)
+
+        rff = UNSegment('RFF')
+        rff[0] = ['TN', error_segment_ref]
+        aperak.append(rff)
+
+        rff2 = UNSegment('RFF')
+        rff2[0] = ['E66', doc_message_number]
+        aperak.append(rff2)
+
+        unt = UNSegment('UNT')
+        unt[0] = str(reduce(lambda acc, _: acc + 1, aperak, 0) - 1)
+        unt[1] = UNIQUE_ID
+        aperak.append(unt)
+
+        unz = UNSegment('UNZ')
+        unz[0] = '1'
+        unz[1] = UNIQUE_ID
+        aperak.append(unz)
+
+        return edi.rstrip(aperak)
 
     """
     Dictionary out of payload segments
