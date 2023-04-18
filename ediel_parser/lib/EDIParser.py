@@ -389,7 +389,7 @@ class EDIParser():
         aperak.append(loc[1])
         aperak.append(loc[0])
         dtm = list(filter(lambda s: s.tag == 'DTM' and s['date-time-period']['date-time-period_qualifier'].value == '324', segments))[0]
-        dtm[0]['date-time-period_format_qualifier'] = '710'
+        dtm[0]['date-time-period_format_qualifier'] = '719'
         aperak.append(dtm)
         aperak.append(segments['STS'])
 
@@ -409,7 +409,7 @@ class EDIParser():
 
         unt = UNSegment('UNT')
         unt[0] = str(reduce(lambda acc, _: acc + 1, aperak, 0) - 1)
-        unt[1] = UNIQUE_ID
+        unt[1] = '1'
         aperak.append(unt)
 
         unz = UNSegment('UNZ')
