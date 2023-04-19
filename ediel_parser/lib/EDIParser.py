@@ -381,31 +381,36 @@ class EDIParser():
         nad3[0] = 'DDQ'
         aperak.append(nad3)
 
-        ide = UNSegment('IDE')
-        ide[0] = '24'
-        ide[1] = UNIQUE_ID
-        aperak.append(ide)
-        loc = list(filter(lambda s: s.tag == 'LOC', segments))
-        aperak.append(loc[1])
-        aperak.append(loc[0])
-        dtm = list(filter(lambda s: s.tag == 'DTM' and s['date-time-period']['date-time-period_qualifier'].value == '324', segments))[0]
-        dtm[0]['date-time-period_format_qualifier'] = '719'
-        aperak.append(dtm)
-        aperak.append(segments['STS'])
+        for s in segments:
+            if s.tag == 'IDE': # transaction
+                transaction_id = s['identification_number']['identity_number'].value
 
-        sts = UNSegment('STS')
-        sts[0] = ['E01', None, '260']
-        sts[1] = '41'
-        sts[2] = ['E50', None, '260']
-        aperak.append(sts)
+                ide = UNSegment('IDE')
+                ide[0] = '24'
+                ide[1] = transaction_id
+                aperak.append(ide)
+                loc = list(filter(lambda s: s.tag == 'LOC', segments))
+                aperak.append(loc[1])
+                aperak.append(loc[0])
+                dtm = list(filter(lambda s: s.tag == 'DTM' and s['date-time-period']['date-time-period_qualifier'].value == '324', segments))[0]
+                dtm[0]['date-time-period_format_qualifier'] = '719'
+                aperak.append(dtm)
+                aperak.append(segments['STS'])
 
-        rff = UNSegment('RFF')
-        rff[0] = ['TN', error_segment_ref]
-        aperak.append(rff)
+                sts = UNSegment('STS')
+                sts[0] = ['E01', None, '260']
+                sts[1] = '41'
+                sts[2] = ['E19', None, '260']
+                aperak.append(sts)
+                sts
 
-        rff2 = UNSegment('RFF')
-        rff2[0] = ['E66', doc_message_number]
-        aperak.append(rff2)
+                rff = UNSegment('RFF')
+                rff[0] = ['TN', error_segment_ref]
+                aperak.append(rff)
+
+                rff2 = UNSegment('RFF')
+                rff2[0] = ['E66', doc_message_number]
+                aperak.append(rff2)
 
         unt = UNSegment('UNT')
         unt[0] = str(reduce(lambda acc, _: acc + 1, aperak, 0) - 1)
