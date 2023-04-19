@@ -381,6 +381,7 @@ class EDIParser():
         nad3[0] = 'DDQ'
         aperak.append(nad3)
 
+        i = 0
         for s in segments:
             if s.tag == 'IDE': # transaction
                 transaction_id = s['identification_number']['identity_number'].value
@@ -400,9 +401,13 @@ class EDIParser():
                 sts = UNSegment('STS')
                 sts[0] = ['E01', None, '260']
                 sts[1] = '41'
-                sts[2] = ['E19', None, '260']
+                if(i % 2 == 0):
+                    sts[2] = ['E19', None, '260']
+                else:
+                    sts[2] = ['E50', None, '260']
+
+                i = i + 1
                 aperak.append(sts)
-                sts
 
                 rff = UNSegment('RFF')
                 rff[0] = ['TN', error_segment_ref]
