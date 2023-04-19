@@ -396,7 +396,7 @@ class EDIParser():
         sts = UNSegment('STS')
         sts[0] = ['E01', None, '260']
         sts[1] = '41'
-        sts[2] = ['E19', None, '260']
+        sts[2] = ['E50', None, '260']
         aperak.append(sts)
 
         rff = UNSegment('RFF')
