@@ -343,7 +343,7 @@ class EDIParser():
 
         unh = UNSegment('UNH')
         unh['r:0062'] = '1'
-        unh[1] = ['UTILTS', 'D', '02B', 'UN', 'E5SE1B']
+        unh[1] = ['UTILTS', 'D', '02B', 'UN', 'E5SE9B']
         aperak.append(unh)
 
         bgm = UNSegment('BGM')
@@ -367,15 +367,15 @@ class EDIParser():
         mks[1] = ['E02', None, '260']
         aperak.append(mks)
 
-        nad1 = UNSegment('NAD')
-        nad1['party_qualifier'] = 'MS'
-        nad1['party_identification_details'] = [self.our_ediel_id, 'SVK', '260']
-        aperak.append(nad1)
-
         nad2 = UNSegment('NAD')
         nad2[0] = 'MR' # message receiver
         nad2[1] = [RECIPIENT_EDIEL_ID, 'SVK', '260']
         aperak.append(nad2)
+
+        nad1 = UNSegment('NAD')
+        nad1['party_qualifier'] = 'MS'
+        nad1['party_identification_details'] = [self.our_ediel_id, 'SVK', '260']
+        aperak.append(nad1)
 
         nad3 = UNSegment('NAD')
         nad3[0] = 'DDQ'
@@ -391,23 +391,22 @@ class EDIParser():
                 ide[1] = transaction_id
                 aperak.append(ide)
                 loc = list(filter(lambda s: s.tag == 'LOC', segments))
-                aperak.append(loc[1])
-                aperak.append(loc[0])
-                dtm = list(filter(lambda s: s.tag == 'DTM' and s['date-time-period']['date-time-period_qualifier'].value == '324', segments))[0]
-                dtm[0]['date-time-period_format_qualifier'] = '719'
-                aperak.append(dtm)
-                aperak.append(segments['STS'])
 
                 sts = UNSegment('STS')
                 sts[0] = ['E01', None, '260']
                 sts[1] = '41'
                 if(i % 2 == 0):
                     sts[2] = ['E19', None, '260']
+                    aperak.append(loc[1])
+                    aperak.append(loc[0])
                 else:
+                    aperak.append(loc[3])
+                    aperak.append(loc[2])
                     sts[2] = ['E50', None, '260']
 
-                i = i + 1
+                aperak.append(segments['STS'])
                 aperak.append(sts)
+                i = i + 1
 
                 rff = UNSegment('RFF')
                 rff[0] = ['TN', error_segment_ref]
