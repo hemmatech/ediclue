@@ -291,8 +291,7 @@ class EDIParser():
         unz[0] = '1'
         unz[1] = UNIQUE_ID
         aperak.append(unz)
-        aperak = self.check_functional_errors(segments, aperak)
-        aperaks.append(edi.rstrip(aperak))
+        aperaks.append(edi.rstrip(self.check_functional_errors(segments, aperak)))
 
         return aperaks
 
@@ -426,7 +425,7 @@ class EDIParser():
         unz[1] = UNIQUE_ID
         aperak.append(unz)
 
-        return edi.rstrip(aperak)
+        return aperak
 
     """
     Dictionary out of payload segments
