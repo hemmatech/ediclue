@@ -304,12 +304,12 @@ class EDIParser():
             if s.tag == 'QTY':
                 if s['quantity_details']['quantity_qualifier'].value == '220':
                     if last_qty_220:
-                        last_qty_diff = last_qty_220 - int(s['quantity_details']['quantity'].value * 1_000)
+                        last_qty_diff = last_qty_220 - int(float(s['quantity_details']['quantity'].value) * 1_000)
                         last_qty_220 = None
                     else:
-                        last_qty_220 = int(s['quantity_details']['quantity'].value * 1_000)
+                        last_qty_220 = int(float(s['quantity_details']['quantity'].value) * 1_000)
                 elif s['quantity_details']['quantity_qualifier'].value == '136':
-                    if int(s['quantity_details']['quantity'].value * 1_000) != last_qty_diff:
+                    if int(float(s['quantity_details']['quantity'].value) * 1_000) != last_qty_diff:
                         return self.create_utilts_err(segments)
 
         return aperak
