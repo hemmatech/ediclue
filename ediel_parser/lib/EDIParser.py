@@ -298,7 +298,7 @@ class EDIParser():
 
     def check_functional_errors(self, segments: List[Segment], aperak: List[Segment]):
         last_qty_220 = None
-        last_qty_diff = 0
+        last_qty_diff = None
         qty_136 = 0
 
         for s in segments:
@@ -312,7 +312,7 @@ class EDIParser():
                 elif s['quantity_details']['quantity_qualifier'].value == '136':
                     qty_136 += int(float(s['quantity_details']['quantity'].value) * 1_000)
 
-        if(isclose(last_qty_diff, qty_136, abs_tol=10)):
+        if(not last_qty_diff or isclose(last_qty_diff, qty_136, abs_tol=10)):
             return aperak
         else:
             return self.create_utilts_err(segments, 'E19')
