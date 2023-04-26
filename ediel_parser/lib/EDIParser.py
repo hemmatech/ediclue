@@ -215,7 +215,7 @@ class EDIParser():
         bgm[2] = '9'
 
         for s in segments:
-            if s.tag == 'RFF' and s['reference']['reference_qualifier'] == 'MG':
+            if s.tag == 'RFF' and s['reference']['reference_qualifier'].value == 'MG':
                 bgm[0] = '312' # Positive
                 validation = True
 
