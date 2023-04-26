@@ -2,6 +2,7 @@ import json
 from datetime import datetime
 from functools import reduce
 from hashlib import md5
+from math import isclose
 import time
 import email
 from email.utils import formatdate
@@ -295,25 +296,28 @@ class EDIParser():
 
         return aperaks
 
-    def check_functional_errors(self, segments, aperak):
+    def check_functional_errors(self, segments: List[Segment], aperak: List[Segment]):
         last_qty_220 = None
         last_qty_diff = 0
+        qty_136 = 0
 
         for s in segments:
             if s.tag == 'QTY':
                 if s['quantity_details']['quantity_qualifier'].value == '220':
                     if last_qty_220:
-                        last_qty_diff = last_qty_220 - int(float(s['quantity_details']['quantity'].value) * 1_000)
+                        last_qty_diff = int(float(s['quantity_details']['quantity'].value) * 1_000) - last_qty_220
                         last_qty_220 = None
                     else:
                         last_qty_220 = int(float(s['quantity_details']['quantity'].value) * 1_000)
                 elif s['quantity_details']['quantity_qualifier'].value == '136':
-                    if int(float(s['quantity_details']['quantity'].value) * 1_000) != last_qty_diff:
-                        return self.create_utilts_err(segments)
+                    qty_136 += int(float(s['quantity_details']['quantity'].value) * 1_000)
 
-        return aperak
+        if(isclose(last_qty_diff, qty_136, abs_tol=10)):
+            return aperak
+        else:
+            return self.create_utilts_err(segments, 'E19')
 
-    def create_utilts_err(self, segments):
+    def create_utilts_err(self, segments: List[Segment], error: str = None):
         segment_hash = segments.__str__()
         unix_timestamp = time.time()
         hash_string = '{}:{}'.format(segment_hash, unix_timestamp).encode('utf-8')
@@ -394,8 +398,8 @@ class EDIParser():
                 sts = UNSegment('STS')
                 sts[0] = ['E01', None, '260']
                 sts[1] = '41'
-                if(i % 2 == 0):
-                    sts[2] = ['E19', None, '260']
+                if(error):
+                    sts[2] = [error, None, '260']
                     aperak.append(loc[1])
                     aperak.append(loc[0])
                 else:
