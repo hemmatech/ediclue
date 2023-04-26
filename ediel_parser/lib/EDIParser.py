@@ -214,12 +214,16 @@ class EDIParser():
         bgm[1] = UNIQUE_ID
         bgm[2] = '9'
 
-        for s in segments:
-            if s.tag == 'RFF' and s['reference']['reference_qualifier'].value == 'MG':
-                bgm[0] = '312' # Positive
-                validation = True
+        if 'RFF' in segments:
+            for s in segments:
+                if s.tag == 'RFF' and s['reference']['reference_qualifier'].value == 'MG':
+                    validation = True
+        else:
+            validation = True
 
-        if not validation:
+        if validation:
+            bgm[0] = '312' # Positive
+        else:
             incorrect_field = '224'
 
         aperak.append(bgm)
