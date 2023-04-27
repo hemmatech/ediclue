@@ -304,9 +304,17 @@ class EDIParser():
         last_qty_220 = None
         last_qty_diff = None
         qty_136 = 0
+        error = None
 
         for s in segments:
-            if s.tag == 'QTY':
+            if s.tag == 'IDE':
+                if(not last_qty_diff or not last_qty_220 or isclose(last_qty_diff, qty_136, abs_tol=10)):
+                    last_qty_220 = None
+                    last_qty_diff = None
+                    qty_136 = 0
+                else:
+                    error = 'E19'
+            elif s.tag == 'QTY':
                 if s['quantity_details']['quantity_qualifier'].value == '220':
                     if last_qty_220:
                         last_qty_diff = int(float(s['quantity_details']['quantity'].value) * 1_000) - last_qty_220
@@ -316,10 +324,10 @@ class EDIParser():
                 elif s['quantity_details']['quantity_qualifier'].value == '136':
                     qty_136 += int(float(s['quantity_details']['quantity'].value) * 1_000)
 
-        if(not last_qty_diff or isclose(last_qty_diff, qty_136, abs_tol=10)):
-            return aperak
+        if error:
+            return self.create_utilts_err(segments, error)
         else:
-            return self.create_utilts_err(segments, 'E19')
+            return aperak
 
     def create_utilts_err(self, segments: List[Segment], error: str = None):
         segment_hash = segments.__str__()
