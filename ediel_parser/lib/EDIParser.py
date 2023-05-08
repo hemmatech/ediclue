@@ -258,6 +258,8 @@ class EDIParser():
                 erc = UNSegment('ERC')
                 if validation:
                     erc[0] = ['100', None, '260']
+                elif not self.check_ref_qualifier(segments):
+                    erc[0] = ['41', None, '512']
                 else:
                     erc[0] = ['41', None, '260']
 
@@ -267,9 +269,6 @@ class EDIParser():
                 ftx[0] = 'AAO'
                 if validation:
                     ftx[3] = 'OK'
-                elif not self.check_ref_qualifier(segments):
-                    ftx[2] = [incorrect_field, None , '512']
-                    ftx[3] = 'MANDATORY FIELD MISSING'
                 else:
                     ftx[2] = [incorrect_field, None , '260']
                     ftx[3] = 'MANDATORY FIELD MISSING'
