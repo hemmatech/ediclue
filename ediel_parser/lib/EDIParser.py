@@ -219,6 +219,8 @@ class EDIParser():
 
         if validation:
             bgm[0] = '312' # Positive
+        elif not self.check_ref_qualifier(segments):
+            incorrect_field = '512'
         else:
             incorrect_field = '224'
 
