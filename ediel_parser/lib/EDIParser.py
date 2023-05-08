@@ -214,11 +214,7 @@ class EDIParser():
         bgm[1] = UNIQUE_ID
         bgm[2] = '9'
 
-        if 'RFF' in segments:
-            for s in segments:
-                if s.tag == 'RFF' and s['reference']['reference_qualifier'].value == 'MG':
-                    validation = True
-        else:
+        if self.check_ref_qualifier(segments) and self.check_reg_moment(segments):
             validation = True
 
         if validation:
@@ -271,6 +267,9 @@ class EDIParser():
                 ftx[0] = 'AAO'
                 if validation:
                     ftx[3] = 'OK'
+                elif not self.check_ref_qualifier(segments):
+                    ftx[2] = [incorrect_field, None , '512']
+                    ftx[3] = 'MANDATORY FIELD MISSING'
                 else:
                     ftx[2] = [incorrect_field, None , '260']
                     ftx[3] = 'MANDATORY FIELD MISSING'
@@ -299,6 +298,27 @@ class EDIParser():
         aperaks.append(edi.rstrip(self.check_functional_errors(segments, aperak)))
 
         return aperaks
+
+    def check_ref_qualifier(self, segments):
+        seen_dtm = False
+        for s in segments:
+            if s.tag == 'DTM' and s['date-time-period']['date-time-period_qualifier']:
+                seen_dtm = True
+            elif s.tag == 'SEQ' and seen_dtm:
+                seen_dtm = False
+            elif s.tag == 'SEQ' and not seen_dtm:
+                return False
+
+        return False
+
+    def check_reg_moment(self, segments):
+        if 'RFF' in segments:
+            for s in segments:
+                if s.tag == 'RFF' and s['reference']['reference_qualifier'].value == 'MG':
+                    return True
+        else:
+            return True
+        return False
 
     def check_functional_errors(self, segments: List[Segment], aperak: List[Segment]):
         last_qty_220 = None
