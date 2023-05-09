@@ -344,7 +344,7 @@ class EDIParser():
                     if float(s['quantity_details']['quantity'].value) >= 0:
                         qty_136 += int(float(s['quantity_details']['quantity'].value) * 1_000)
                     else:
-                        error = 'E23'
+                        error = 'E19'
 
         if error:
             return self.create_utilts_err(segments, error)
