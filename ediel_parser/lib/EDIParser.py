@@ -322,17 +322,34 @@ class EDIParser():
     def check_functional_errors(self, segments: List[Segment], aperak: List[Segment]):
         last_qty_220 = None
         last_qty_diff = None
+        num_qty_136 = 0
         qty_136 = 0
         error = []
+        ediel_tz_offset = None
+        resolution = None
+        start_time = None
+        end_time = None
 
         for s in segments:
             if s.tag == 'IDE':
-                if(not last_qty_diff or not last_qty_220 or isclose(last_qty_diff, qty_136, abs_tol=10)):
+                if(num_qty_136 and not self.check_num_qty(resolution, num_qty_136, start_time, end_time)):
+                    error.append('E50')
+                elif(not last_qty_diff or not last_qty_220 or isclose(last_qty_diff, qty_136, abs_tol=10)):
                     last_qty_220 = None
                     last_qty_diff = None
                     qty_136 = 0
                 else:
                     error.append('E19')
+            elif s.tag == 'DTM' and s["date-time-period"]["date-time-period_qualifier"].value == '354':
+                resolution = self.get_resolution(s)
+            elif s.tag == 'DTM' and s["date-time-period"]["date-time-period_qualifier"].value == '735':
+                ediel_tz_offset = s["date-time-period"]["date-time-period"].value
+            elif s.tag == 'DTM' and s["date-time-period"]["date-time-period_qualifier"].value == '324':
+                start_time = s["date-time-period"]["date-time-period"].value[:12]
+                start_time = self.to_datetime(start_time, ediel_tz_offset)
+
+                end_time = s["date-time-period"]["date-time-period"].value[12:]
+                end_time = self.to_datetime(end_time, ediel_tz_offset)
             elif s.tag == 'QTY':
                 if s['quantity_details']['quantity_qualifier'].value == '220':
                     if last_qty_220:
@@ -343,11 +360,13 @@ class EDIParser():
                 elif s['quantity_details']['quantity_qualifier'].value == '136':
                     if float(s['quantity_details']['quantity'].value) >= 0:
                         qty_136 += int(float(s['quantity_details']['quantity'].value) * 1_000)
+                        num_qty_136 += 1
                     else:
                         last_qty_220 = None
                         last_qty_diff = None
                         qty_136 = 0
-                        error.append('E50')
+                        num_qty_136 = 0
+                        error.append('E98')
 
         if error:
             return self.create_utilts_err(segments, error)
@@ -465,6 +484,46 @@ class EDIParser():
         aperak.append(unz)
 
         return aperak
+
+    """
+    Convert EDIEL UTILTS DTM+324 values (CCYYMM[DDHHmm]) into RFC3339 compatible datetime string
+    """
+    def to_datetime(self, ediel_datetime: str, offset: str) -> datetime:
+        return datetime.strptime(ediel_datetime + offset, "%Y%m%d%H%M%z")
+
+    def check_num_qty(self, resolution: str, steps: int, start_time: datetime, end_time: datetime) -> bool:
+        match resolution:
+            case "HOURLY":
+                return steps % (24 * (end_time - start_time).days) == 0
+            case "DAILY":
+                return steps % 1
+            case "MONTHLY":
+                return steps % 1
+            case "YEARLY":
+                return steps % 1
+        raise AssertionError(f"unsupported resolution, resolution={resolution}")
+
+    def get_resolution(self, segment_period: dict) -> str:
+        period = segment_period["date-time-period"]["date-time-period"].value
+        period_format_qualifier = segment_period["date-time-period"][
+            "date-time-period_format_qualifier"
+        ].value
+        match period_format_qualifier:
+            case "801":
+                if period == "1":
+                    return "MONTHLY"
+            case "802":
+                if period == "1":
+                    return "MONTHLY"
+            case "804":
+                if period == "1":
+                    return "DAILY"
+            case "806":
+                if period == "60":
+                    return "HOURLY"
+        raise AssertionError(
+            f"unsupported combination of unit and time period, period={period}, format={period_format_qualifier}"
+        )
 
     """
     Dictionary out of payload segments
