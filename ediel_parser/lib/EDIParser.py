@@ -323,7 +323,7 @@ class EDIParser():
         last_qty_220 = None
         last_qty_diff = None
         qty_136 = 0
-        error = None
+        error = []
 
         for s in segments:
             if s.tag == 'IDE':
@@ -332,7 +332,7 @@ class EDIParser():
                     last_qty_diff = None
                     qty_136 = 0
                 else:
-                    error = 'E19'
+                    error.append('E19')
             elif s.tag == 'QTY':
                 if s['quantity_details']['quantity_qualifier'].value == '220':
                     if last_qty_220:
@@ -344,14 +344,17 @@ class EDIParser():
                     if float(s['quantity_details']['quantity'].value) >= 0:
                         qty_136 += int(float(s['quantity_details']['quantity'].value) * 1_000)
                     else:
-                        error = 'E19'
+                        last_qty_220 = None
+                        last_qty_diff = None
+                        qty_136 = 0
+                        error.append('E50')
 
         if error:
             return self.create_utilts_err(segments, error)
         else:
             return aperak
 
-    def create_utilts_err(self, segments: List[Segment], error: str = None):
+    def create_utilts_err(self, segments: List[Segment], error: List[str]):
         segment_hash = segments.__str__()
         unix_timestamp = time.time()
         hash_string = '{}:{}'.format(segment_hash, unix_timestamp).encode('utf-8')
@@ -432,14 +435,12 @@ class EDIParser():
                 sts = UNSegment('STS')
                 sts[0] = ['E01', None, '260']
                 sts[1] = '41'
-                if(error):
-                    sts[2] = [error, None, '260']
-                    aperak.append(loc[1])
-                    aperak.append(loc[0])
+                if len(error) > i:
+                    sts[2] = [error[i], None, '260']
                 else:
-                    aperak.append(loc[3])
-                    aperak.append(loc[2])
-                    sts[2] = ['E50', None, '260']
+                    sts[2] = [error[len(error) - i + 1], None, '260']
+                aperak.append(loc[i*2+1])
+                aperak.append(loc[i*2])
 
                 aperak.append(segments['STS'])
                 aperak.append(sts)
