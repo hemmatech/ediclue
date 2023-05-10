@@ -329,17 +329,23 @@ class EDIParser():
         resolution = None
         start_time = None
         end_time = None
+        i = 0
 
         for s in segments:
             if s.tag == 'IDE':
+                i += 1
                 if(num_qty_136 and not self.check_num_qty(resolution, num_qty_136, start_time, end_time)):
-                    error.append('E50')
+                    if len(error) < i: error.append('E50')
                 elif(not last_qty_diff or not last_qty_220 or isclose(last_qty_diff, qty_136, abs_tol=10)):
                     last_qty_220 = None
                     last_qty_diff = None
                     qty_136 = 0
                 else:
-                    error.append('E19')
+                    if len(error) < i: error.append('E19')
+
+                num_qty_136 = 0
+            elif s.tag == 'STS' and s["status_event"]["status_event-coded"].value == '46' and num_qty_136 > 0:
+                if len(error) < i: error.append('E90')
             elif s.tag == 'DTM' and s["date-time-period"]["date-time-period_qualifier"].value == '354':
                 resolution = self.get_resolution(s)
             elif s.tag == 'DTM' and s["date-time-period"]["date-time-period_qualifier"].value == '735':
@@ -365,8 +371,8 @@ class EDIParser():
                         last_qty_220 = None
                         last_qty_diff = None
                         qty_136 = 0
-                        num_qty_136 = 0
-                        error.append('E98')
+                        num_qty_136 += 1
+                        if len(error) < i: error.append('E98')
 
         if error:
             return self.create_utilts_err(segments, error)
