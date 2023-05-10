@@ -457,7 +457,7 @@ class EDIParser():
                 if len(error) > i:
                     sts[2] = [error[i], None, '260']
                 else:
-                    sts[2] = [error[len(error) - i + 1], None, '260']
+                    sts[2] = [error[-1:], None, '260']
                 aperak.append(loc[i*2+1])
                 aperak.append(loc[i*2])
 
