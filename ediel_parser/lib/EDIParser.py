@@ -301,14 +301,14 @@ class EDIParser():
     def check_ref_qualifier(self, segments):
         seen_dtm = False
         for s in segments:
-            if s.tag == 'DTM' and s['date-time-period']['date-time-period_qualifier']:
+            if s.tag == 'DTM' and s['date-time-period']['date-time-period_qualifier'].value == '137':
                 seen_dtm = True
             elif s.tag == 'SEQ' and seen_dtm:
-                seen_dtm = False
+                continue
             elif s.tag == 'SEQ' and not seen_dtm:
                 return False
 
-        return False
+        return seen_dtm
 
     def check_reg_moment(self, segments):
         if 'RFF' in segments:
