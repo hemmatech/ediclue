@@ -502,9 +502,9 @@ class EDIParser():
             case "HOURLY":
                 return steps % (24 * (end_time - start_time).days) == 0
             case "DAILY":
-                return steps % 1
+                return steps % (end_time - start_time).days
             case "MONTHLY":
-                return steps % 1
+                return steps % ((end_time.year - start_time.year) * 12 + (end_time.month - start_time.month)) == 0
             case "YEARLY":
                 return steps % 1
         raise AssertionError(f"unsupported resolution, resolution={resolution}")
