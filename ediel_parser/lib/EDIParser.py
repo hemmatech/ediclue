@@ -315,8 +315,6 @@ class EDIParser():
             for s in segments:
                 if s.tag == 'RFF' and s['reference']['reference_qualifier'].value == 'MG':
                     return True
-        else:
-            return True
         return False
 
     def check_functional_errors(self, segments: List[Segment], aperak: List[Segment]):
