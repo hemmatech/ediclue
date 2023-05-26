@@ -2,11 +2,13 @@ import json
 from datetime import datetime
 from functools import reduce
 from hashlib import md5
+from math import isclose
 import time
 import email
-from email.utils import COMMASPACE, formatdate
+from email.utils import formatdate
 from email.mime.base import MIMEBase
 from email import encoders
+from typing import List, Tuple
 
 from pydifact.message import Message as PMessage
 
@@ -42,7 +44,7 @@ class EDIParser():
         elif self.format == 'mail':
             return self.parse_email()
 
-    def get_props_for(self, segment) -> (str, list):
+    def get_props_for(self, segment) -> Tuple[str, list]:
         if self.format == 'json':
             return segment.pop(0), segment
         elif self.format == 'edi' or self.format == 'mail':
@@ -61,7 +63,7 @@ class EDIParser():
         content = content.decode('utf-8')
         segments = self.parse_edi(content)
         return segments
-        
+
 
     def load_segment(self, segment):
         tag, elements = self.get_props_for(segment)
@@ -106,7 +108,7 @@ class EDIParser():
         else:
             return segment
 
-    def create_contrl(self, segments=None) -> [Segment]:
+    def create_contrl(self, segments=None) -> List[Segment]:
         segments = self.segments if segments is None else segments
         unix_timestamp = time.time()
         segment_hash = segments.__str__()
@@ -165,62 +167,81 @@ class EDIParser():
     """
     Generate aperak based on payload information
     """
-    def create_aperak(self, segments = None) -> [Segment]:
+    def create_aperak(self, segments = None) -> List[List[Segment]]:
 
         segments = self.segments if segments is None else segments
-
-        unix_timestamp = time.time()
         segment_hash = segments.__str__()
+        unix_timestamp = time.time()
         hash_string = '{}:{}'.format(segment_hash, unix_timestamp).encode('utf-8')
-        UNIQUE_ID = str(md5(hash_string).hexdigest())[:14]
-        RECIPIENT_EDIEL_ID = self.segments['UNB']['interchange_sender'][0].value
 
+        APERAK_START_ID = 1337
+        UNIQUE_ID = str(md5(hash_string).hexdigest())[:14]
+        RECIPIENT_EDIEL_ID = segments['UNB']['interchange_sender'][0].value
+
+        aperaks = []
+        incorrect_field = None
+        validation = False
         timestamp_now = edi.format_timestamp(datetime.now())
         partner_identification_code_qualifier = segments['UNB']['interchange_sender']['partner_identification_code_qualifier'].value
+        doc_name = segments['BGM']['document-message_name']
+        doc_message_name_code = doc_name['document-message_name-coded'].value
+        doc_responsible_agency = doc_name['code_list_responsible_agency-coded'].value
         doc_message_number = segments['BGM']['document-message_number'].value
         application_reference = segments['UNB']['application_reference'].value
+
+        aperak_cnt = 0
 
         aperak = [UNSegment('UNA')]
 
         unb = UNSegment('UNB')
-        unb['syntax_identifier']['syntax_identifier'] = 'UNOB'
+        unb['syntax_identifier']['syntax_identifier'] = 'UNOC'
         unb['syntax_identifier']['syntax_version_number'] = '3'
         unb['interchange_sender'] = [self.our_ediel_id, partner_identification_code_qualifier]
         unb['interchange_recipient'] = [RECIPIENT_EDIEL_ID, partner_identification_code_qualifier]
         unb['date-time_of_preparation'] = [timestamp_now[2:8], timestamp_now[8:]]
         unb['interchange_control_reference'] = UNIQUE_ID
         unb['application_reference'] = application_reference
+        unb['acknowledgement_request'] = '1'
         aperak.append(unb)
-        
+
         unh = UNSegment('UNH')
         unh['r:0062'] = UNIQUE_ID # UNIQUE_ID
-        unh[1] = ['APERAK', 'D', '96A', 'UN', 'EDIEL2']
+        unh[1] = ['APERAK', 'D', '04A', 'UN', 'E5SE1B']
         aperak.append(unh)
 
         bgm = UNSegment('BGM')
-        bgm['response_type-coded'] = '29'
+        bgm[0] = '313' # Negative
+        bgm[1] = UNIQUE_ID
+        bgm[2] = '9'
+
+        if self.check_ref_qualifier(segments) and self.check_reg_moment(segments):
+            validation = True
+
+        if validation:
+            bgm[0] = '312' # Positive
+        elif not self.check_ref_qualifier(segments):
+            incorrect_field = '512'
+        else:
+            incorrect_field = '224'
+
         aperak.append(bgm)
 
         dtm = UNSegment('DTM')
         dtm[0] = ['137', timestamp_now, '203']
         aperak.append(dtm)
 
-        ftx_uts = UNSegment('FTX')
-        ftx_uts[0] = 'ZZZ'
-        ftx_uts[3] = str(unix_timestamp)
-        aperak.append(ftx_uts)
+        timezone = UNSegment('DTM')
+        timezone[0] = ['735', '+0100', '406']
+        aperak.append(timezone)
 
-        # group1
-        rff =  UNSegment('RFF')
-        rff[0] = ['ACW', doc_message_number]
-        aperak.append(rff)
+        doc = UNSegment('DOC')
+        doc[0] = [doc_message_name_code, '', doc_responsible_agency]
+        doc[1] = [doc_message_number]
+        aperak.append(doc)
 
-        # group 2
         nad1 = UNSegment('NAD')
         nad1['party_qualifier'] = 'MS'
         nad1['party_identification_details'] = [self.our_ediel_id, 'SVK', '260']
-        nad1['city_name'] = self.our_city
-        nad1['country-coded'] = 'SE'
         aperak.append(nad1)
 
         nad2 = UNSegment('NAD')
@@ -228,17 +249,289 @@ class EDIParser():
         nad2[1] = [RECIPIENT_EDIEL_ID, 'SVK', '260']
         aperak.append(nad2)
 
+        nad3 = UNSegment('NAD')
+        nad3[0] = 'DDQ'
+        aperak.append(nad3)
+
+        for s in segments:
+            if s.tag == 'IDE': # transaction
+                transaction_id = s['identification_number']['identity_number'].value
+
+                erc = UNSegment('ERC')
+                if validation:
+                    erc[0] = ['100', None, '260']
+                else:
+                    erc[0] = ['41', None, '260']
+
+                aperak.append(erc)
+
+                ftx = UNSegment('FTX') # godkänt
+                ftx[0] = 'AAO'
+                if validation:
+                    ftx[3] = 'OK'
+                else:
+                    ftx[2] = [incorrect_field, None , '260']
+                    ftx[3] = 'MANDATORY FIELD MISSING'
+
+                aperak.append(ftx)
+
+                aperak_id = str(APERAK_START_ID + aperak_cnt)
+                aperak_cnt += 1
+                rff = UNSegment('RFF')
+                rff[0] = ['DM', aperak_id]
+                aperak.append(rff)
+
+                rff2 = UNSegment('RFF')
+                rff2[0] = ['ACW', transaction_id]
+                aperak.append(rff2)
+
         unt = UNSegment('UNT')
-        unt[0] = str(reduce(lambda acc, s: acc + 1, aperak, 0) - 1)
-        unt[1] = UNIQUE_ID # segments['UNH']['r:0062'].value
+        unt[0] = str(reduce(lambda acc, _: acc + 1, aperak, 0) - 1)
+        unt[1] = UNIQUE_ID
         aperak.append(unt)
 
         unz = UNSegment('UNZ')
         unz[0] = '1'
         unz[1] = UNIQUE_ID
         aperak.append(unz)
-        
-        return edi.rstrip(aperak)
+        aperaks.append(edi.rstrip(self.check_functional_errors(segments, aperak)))
+
+        return aperaks
+
+    def check_ref_qualifier(self, segments):
+        seen_dtm = False
+        for s in segments:
+            if s.tag == 'DTM' and s['date-time-period']['date-time-period_qualifier'].value == '137':
+                seen_dtm = True
+            elif s.tag == 'SEQ' and seen_dtm:
+                continue
+            elif s.tag == 'SEQ' and not seen_dtm:
+                return False
+
+        return seen_dtm
+
+    def check_reg_moment(self, segments):
+        seen_rff = False
+        print(segments)
+        for s in segments:
+            if s.tag == 'RFF' and s['reference']['reference_qualifier'].value == 'MG':
+                return True
+            elif s.tag == 'RFF':
+                seen_rff = True
+
+        return not seen_rff
+
+    def check_functional_errors(self, segments: List[Segment], aperak: List[Segment]):
+        last_qty_220 = None
+        last_qty_diff = None
+        num_qty_136 = 0
+        qty_136 = 0
+        error = []
+        ediel_tz_offset = None
+        resolution = None
+        start_time = None
+        end_time = None
+        i = 0
+
+        for s in segments:
+            if s.tag == 'IDE':
+                i += 1
+                if(num_qty_136 and not self.check_num_qty(resolution, num_qty_136, start_time, end_time)):
+                    if len(error) < i: error.append('E50')
+                elif(not last_qty_diff or not last_qty_220 or isclose(last_qty_diff, qty_136, abs_tol=10)):
+                    last_qty_220 = None
+                    last_qty_diff = None
+                    qty_136 = 0
+                else:
+                    if len(error) < i: error.append('E19')
+
+                num_qty_136 = 0
+            elif s.tag == 'STS' and s["status_event"]["status_event-coded"].value == '46' and num_qty_136 > 0:
+                if len(error) < i: error.append('E90')
+            elif s.tag == 'DTM' and s["date-time-period"]["date-time-period_qualifier"].value == '354':
+                resolution = self.get_resolution(s)
+            elif s.tag == 'DTM' and s["date-time-period"]["date-time-period_qualifier"].value == '735':
+                ediel_tz_offset = s["date-time-period"]["date-time-period"].value
+            elif s.tag == 'DTM' and s["date-time-period"]["date-time-period_qualifier"].value == '324':
+                start_time = s["date-time-period"]["date-time-period"].value[:12]
+                start_time = self.to_datetime(start_time, ediel_tz_offset)
+
+                end_time = s["date-time-period"]["date-time-period"].value[12:]
+                end_time = self.to_datetime(end_time, ediel_tz_offset)
+            elif s.tag == 'QTY':
+                if s['quantity_details']['quantity_qualifier'].value == '220':
+                    if last_qty_220:
+                        last_qty_diff = int(float(s['quantity_details']['quantity'].value) * 1_000) - last_qty_220
+                        last_qty_220 = None
+                    else:
+                        last_qty_220 = int(float(s['quantity_details']['quantity'].value) * 1_000)
+                elif s['quantity_details']['quantity_qualifier'].value == '136':
+                    if float(s['quantity_details']['quantity'].value) >= 0:
+                        qty_136 += int(float(s['quantity_details']['quantity'].value) * 1_000)
+                        num_qty_136 += 1
+                    else:
+                        last_qty_220 = None
+                        last_qty_diff = None
+                        qty_136 = 0
+                        num_qty_136 += 1
+                        if len(error) < i: error.append('E98')
+
+        if error:
+            return self.create_utilts_err(segments, error)
+        else:
+            return aperak
+
+    def create_utilts_err(self, segments: List[Segment], error: List[str]):
+        segment_hash = segments.__str__()
+        unix_timestamp = time.time()
+        hash_string = '{}:{}'.format(segment_hash, unix_timestamp).encode('utf-8')
+
+        UNIQUE_ID = str(md5(hash_string).hexdigest())[:14]
+        RECIPIENT_EDIEL_ID = segments['UNB']['interchange_sender'][0].value
+
+        timestamp_now = edi.format_timestamp(datetime.now())
+        partner_identification_code_qualifier = segments['UNB']['interchange_sender']['partner_identification_code_qualifier'].value
+        error_segment_ref = segments['IDE']['identification_number']['identity_number'].value
+        doc_message_number = segments['BGM']['document-message_number'].value
+        application_reference = segments['UNB']['application_reference'].value
+
+        aperak = [UNSegment('UNA')]
+
+        unb = UNSegment('UNB')
+        unb['syntax_identifier']['syntax_identifier'] = 'UNOC'
+        unb['syntax_identifier']['syntax_version_number'] = '3'
+        unb['interchange_sender'] = [self.our_ediel_id, partner_identification_code_qualifier]
+        unb['interchange_recipient'] = [RECIPIENT_EDIEL_ID, partner_identification_code_qualifier]
+        unb['date-time_of_preparation'] = [timestamp_now[2:8], timestamp_now[8:]]
+        unb['interchange_control_reference'] = UNIQUE_ID
+        unb['application_reference'] = application_reference
+        unb['acknowledgement_request'] = '1'
+        aperak.append(unb)
+
+        unh = UNSegment('UNH')
+        unh['r:0062'] = '1'
+        unh[1] = ['UTILTS', 'D', '02B', 'UN', 'E5SE9B']
+        aperak.append(unh)
+
+        bgm = UNSegment('BGM')
+        bgm[0] = ['ERR', None, '260'] # Negative
+        bgm[1] = UNIQUE_ID
+        bgm[2] = '9'
+        bgm[3] = 'AB'
+
+        aperak.append(bgm)
+
+        dtm = UNSegment('DTM')
+        dtm[0] = ['137', timestamp_now, '203']
+        aperak.append(dtm)
+
+        timezone = UNSegment('DTM')
+        timezone[0] = ['735', '+0100', '406']
+        aperak.append(timezone)
+
+        mks = UNSegment('MKS')
+        mks[0] = '23'
+        mks[1] = ['E02', None, '260']
+        aperak.append(mks)
+
+        nad2 = UNSegment('NAD')
+        nad2[0] = 'MR' # message receiver
+        nad2[1] = [RECIPIENT_EDIEL_ID, 'SVK', '260']
+        aperak.append(nad2)
+
+        nad1 = UNSegment('NAD')
+        nad1['party_qualifier'] = 'MS'
+        nad1['party_identification_details'] = [self.our_ediel_id, 'SVK', '260']
+        aperak.append(nad1)
+
+        nad3 = UNSegment('NAD')
+        nad3[0] = 'DDQ'
+        aperak.append(nad3)
+
+        i = 0
+        for s in segments:
+            if s.tag == 'IDE': # transaction
+                transaction_id = s['identification_number']['identity_number'].value
+
+                ide = UNSegment('IDE')
+                ide[0] = '24'
+                ide[1] = transaction_id
+                aperak.append(ide)
+                loc = list(filter(lambda s: s.tag == 'LOC', segments))
+
+                sts = UNSegment('STS')
+                sts[0] = ['E01', None, '260']
+                sts[1] = '41'
+                if len(error) > i:
+                    sts[2] = [error[i], None, '260']
+                else:
+                    sts[2] = [error[-1:][0], None, '260']
+                aperak.append(loc[i*2+1])
+                aperak.append(loc[i*2])
+
+                aperak.append(segments['STS'])
+                aperak.append(sts)
+                i = i + 1
+
+                rff = UNSegment('RFF')
+                rff[0] = ['TN', error_segment_ref]
+                aperak.append(rff)
+
+                rff2 = UNSegment('RFF')
+                rff2[0] = ['E66', doc_message_number]
+                aperak.append(rff2)
+
+        unt = UNSegment('UNT')
+        unt[0] = str(reduce(lambda acc, _: acc + 1, aperak, 0) - 1)
+        unt[1] = '1'
+        aperak.append(unt)
+
+        unz = UNSegment('UNZ')
+        unz[0] = '1'
+        unz[1] = UNIQUE_ID
+        aperak.append(unz)
+
+        return aperak
+
+    """
+    Convert EDIEL UTILTS DTM+324 values (CCYYMM[DDHHmm]) into RFC3339 compatible datetime string
+    """
+    def to_datetime(self, ediel_datetime: str, offset: str) -> datetime:
+        return datetime.strptime(ediel_datetime + offset, "%Y%m%d%H%M%z")
+
+    def check_num_qty(self, resolution: str, steps: int, start_time: datetime, end_time: datetime) -> bool:
+        match resolution:
+            case "HOURLY":
+                return steps % (24 * (end_time - start_time).days) == 0
+            case "DAILY":
+                return steps % (end_time - start_time).days
+            case "MONTHLY":
+                return steps % ((end_time.year - start_time.year) * 12 + (end_time.month - start_time.month)) == 0
+            case "YEARLY":
+                return steps % 1
+        raise AssertionError(f"unsupported resolution, resolution={resolution}")
+
+    def get_resolution(self, segment_period: dict) -> str:
+        period = segment_period["date-time-period"]["date-time-period"].value
+        period_format_qualifier = segment_period["date-time-period"][
+            "date-time-period_format_qualifier"
+        ].value
+        match period_format_qualifier:
+            case "801":
+                if period == "1":
+                    return "MONTHLY"
+            case "802":
+                if period == "1":
+                    return "MONTHLY"
+            case "804":
+                if period == "1":
+                    return "DAILY"
+            case "806":
+                if period == "60":
+                    return "HOURLY"
+        raise AssertionError(
+            f"unsupported combination of unit and time period, period={period}, format={period_format_qualifier}"
+        )
 
     """
     Dictionary out of payload segments
