@@ -312,7 +312,6 @@ class EDIParser():
 
     def check_reg_moment(self, segments):
         seen_rff = False
-        print(segments)
         for s in segments:
             if s.tag == 'RFF' and s['reference']['reference_qualifier'].value == 'MG':
                 return True
