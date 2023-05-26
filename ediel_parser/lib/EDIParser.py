@@ -311,11 +311,15 @@ class EDIParser():
         return seen_dtm
 
     def check_reg_moment(self, segments):
+        seen_rff = False
+        print(segments)
         for s in segments:
             if s.tag == 'RFF' and s['reference']['reference_qualifier'].value == 'MG':
                 return True
+            elif s.tag == 'RFF':
+                seen_rff = True
 
-        return False
+        return not seen_rff
 
     def check_functional_errors(self, segments: List[Segment], aperak: List[Segment]):
         last_qty_220 = None
