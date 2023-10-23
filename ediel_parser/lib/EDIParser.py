@@ -501,9 +501,9 @@ class EDIParser():
     def check_num_qty(self, resolution: str, steps: int, start_time: datetime, end_time: datetime) -> bool:
         match resolution:
             case "QUARTER_HOURLY":
-                return steps % (4 * 24 * (end_time - start_time).days) == 0
+                return steps % ((end_time - start_time).seconds / 900) == 0
             case "HOURLY":
-                return steps % (24 * (end_time - start_time).days) == 0
+                return steps % ((end_time - start_time).seconds / 3600) == 0
             case "DAILY":
                 return steps % (end_time - start_time).days
             case "MONTHLY":
