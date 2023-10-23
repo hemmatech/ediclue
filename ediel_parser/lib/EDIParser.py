@@ -500,6 +500,8 @@ class EDIParser():
 
     def check_num_qty(self, resolution: str, steps: int, start_time: datetime, end_time: datetime) -> bool:
         match resolution:
+            case "QUARTER_HOURLY":
+                return steps % (4 * 24 * (end_time - start_time).days) == 0
             case "HOURLY":
                 return steps % (24 * (end_time - start_time).days) == 0
             case "DAILY":
@@ -526,7 +528,9 @@ class EDIParser():
                 if period == "1":
                     return "DAILY"
             case "806":
-                if period == "60":
+                if period == "15":
+                    return "QUARTER_HOURLY"
+                elif period == "60":
                     return "HOURLY"
         raise AssertionError(
             f"unsupported combination of unit and time period, period={period}, format={period_format_qualifier}"
