@@ -214,7 +214,7 @@ class EDIParser():
         bgm[1] = UNIQUE_ID
         bgm[2] = '9'
 
-        if self.check_ref_qualifier(segments) and self.check_reg_moment(segments):
+        if self.check_ref_qualifier(segments) and self.check_reg_moment(segments) and self.check_reg_time(segments):
             validation = True
 
         if validation:
@@ -307,6 +307,16 @@ class EDIParser():
                 continue
             elif s.tag == 'SEQ' and not seen_dtm:
                 return False
+
+        return seen_dtm
+
+    def check_reg_time(self, segments):
+        seen_dtm = False
+        for s in segments:
+            if s.tag == 'DTM' and s['date-time-period']['date-time-period_qualifier'].value == '597':
+                seen_dtm = True
+            elif s.tag == 'SEQ' and not seen_dtm:
+                break
 
         return seen_dtm
 
