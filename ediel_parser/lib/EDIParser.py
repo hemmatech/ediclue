@@ -509,11 +509,12 @@ class EDIParser():
         return datetime.strptime(ediel_datetime + offset, "%Y%m%d%H%M%z")
 
     def check_num_qty(self, resolution: str, steps: int, start_time: datetime, end_time: datetime) -> bool:
+        print(f"end_time: {end_time} start_time: {start_time} steps: {steps} seconds: {(end_time - start_time).seconds} resolution: {resolution}")
         match resolution:
             case "QUARTER_HOURLY":
-                return steps % ((end_time - start_time).seconds / 900) == 0
+                return steps % ((end_time - start_time).total_seconds() / 900) == 0
             case "HOURLY":
-                return steps % ((end_time - start_time).seconds / 3600) == 0
+                return steps % ((end_time - start_time).total_seconds() / 3600) == 0
             case "DAILY":
                 return steps % (end_time - start_time).days
             case "MONTHLY":
