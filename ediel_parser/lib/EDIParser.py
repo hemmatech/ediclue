@@ -214,12 +214,12 @@ class EDIParser():
         bgm[1] = UNIQUE_ID
         bgm[2] = '9'
 
-        if self.check_ref_qualifier(segments) and self.check_reg_moment(segments):
+        if self.check_ref_qualifier(segments) and self.check_reg_moment(segments) and self.check_reg_time(segments):
             validation = True
 
         if validation:
             bgm[0] = '312' # Positive
-        elif not self.check_ref_qualifier(segments):
+        elif not self.check_ref_qualifier(segments) or not self.check_reg_time(segments):
             incorrect_field = '512'
         else:
             incorrect_field = '224'
@@ -307,6 +307,16 @@ class EDIParser():
                 continue
             elif s.tag == 'SEQ' and not seen_dtm:
                 return False
+
+        return seen_dtm
+
+    def check_reg_time(self, segments):
+        seen_dtm = False
+        for s in segments:
+            if s.tag == 'DTM' and s['date-time-period']['date-time-period_qualifier'].value == '597':
+                seen_dtm = True
+            elif s.tag == 'SEQ' and not seen_dtm:
+                break
 
         return seen_dtm
 
@@ -499,11 +509,12 @@ class EDIParser():
         return datetime.strptime(ediel_datetime + offset, "%Y%m%d%H%M%z")
 
     def check_num_qty(self, resolution: str, steps: int, start_time: datetime, end_time: datetime) -> bool:
+        print(f"end_time: {end_time} start_time: {start_time} steps: {steps} seconds: {(end_time - start_time).seconds} resolution: {resolution}")
         match resolution:
             case "QUARTER_HOURLY":
-                return steps % ((end_time - start_time).seconds / 900) == 0
+                return steps % ((end_time - start_time).total_seconds() / 900) == 0
             case "HOURLY":
-                return steps % ((end_time - start_time).seconds / 3600) == 0
+                return steps % ((end_time - start_time).total_seconds() / 3600) == 0
             case "DAILY":
                 return steps % (end_time - start_time).days
             case "MONTHLY":
