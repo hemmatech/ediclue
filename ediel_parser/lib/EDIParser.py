@@ -370,8 +370,10 @@ class EDIParser():
             elif s.tag == 'QTY':
                 if s['quantity_details']['quantity_qualifier'].value == '220':
                     if last_qty_220:
-                        last_qty_diff = int(float(s['quantity_details']['quantity'].value) * 1_000) - last_qty_220
-                        last_qty_220 = None
+                        # this should not be null if it is, ignore it
+                        if s['quantity_details']['quantity'].value != 'NULL':
+                            last_qty_diff = int(float(s['quantity_details']['quantity'].value) * 1_000) - last_qty_220
+                            last_qty_220 = None
                     else:
                         last_qty_220 = int(float(s['quantity_details']['quantity'].value) * 1_000)
                 elif s['quantity_details']['quantity_qualifier'].value == '136':
